@@ -1,0 +1,30 @@
+export default async function handler(req, res) {
+  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+
+  const { messages, systemPrompt } = req.body;
+
+  try {
+    const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${process.env.GROQ_API_KEY}`
+      },
+      body: JSON.stringify({
+        model: 'llama3-8b-8192',
+        messages: [
+          ...(systemPrompt ? [{ role: 'system', content: systemPrompt }] : []),
+          ...messages
+        ],
+        max_tokens: 500,
+        temperature: 0.8
+      })
+    });
+
+    const data = await response.json();
+    const result = data.choices?.[0]?.message?.content || '...';
+    res.status(200).json({ result });
+  } catch (err) {
+    res.status(500).json({ error: 'AI error', result: 'Error. Try again.' });
+  }
+}
