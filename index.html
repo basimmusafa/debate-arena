@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Debate Arena</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:ital,wght@0,300;0,400;0,500;1,300&display=swap');
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg: #080810; --surface: #0f0f1a; --surface2: #16162a;
+    --border: rgba(255,255,255,0.07); --user-color: #7c6aff;
+    --ai-color: #ff4d6d; --gold: #ffc94d; --text: #e8e8f0; --muted: #666680;
+  }
+  body { background: var(--bg); color: var(--text); font-family: 'DM Sans', sans-serif; min-height: 100vh; }
+  .bg-orb { position: fixed; border-radius: 50%; filter: blur(80px); pointer-events: none; z-index: 0; }
+  .orb1 { width: 500px; height: 500px; background: radial-gradient(circle, rgba(124,106,255,0.12) 0%, transparent 70%); top: -100px; left: -100px; }
+  .orb2 { width: 400px; height: 400px; background: radial-gradient(circle, rgba(255,77,109,0.1) 0%, transparent 70%); bottom: -80px; right: -80px; }
+  #setup-screen { min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 40px 20px; position: relative; }
+  .setup-inner { position: relative; z-index: 1; width: 100%; max-width: 640px; }
+  .badge { display: inline-flex; align-items: center; gap: 6px; background: rgba(124,106,255,0.15); border: 1px solid rgba(124,106,255,0.3); border-radius: 100px; padding: 6px 14px; font-size: 11px; letter-spacing: 2px; color: #a89fff; font-weight: 500; margin-bottom: 24px; }
+  h1 { font-family: 'Bebas Neue', sans-serif; font-size: clamp(56px, 12vw, 96px); line-height: 0.9; letter-spacing: 2px; margin-bottom: 16px; background: linear-gradient(135deg, #fff 0%, #a89fff 50%, #ff4d6d 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+  .subtitle { font-size: 16px; color: var(--muted); font-style: italic; margin-bottom: 48px; font-weight: 300; }
+  .setup-card { background: var(--surface); border: 1px solid var(--border); border-radius: 20px; padding: 32px; margin-bottom: 16px; }
+  .label { font-size: 11px; letter-spacing: 2px; color: var(--muted); font-weight: 500; margin-bottom: 12px; }
+  .topic-input { width: 100%; background: var(--surface2); border: 1px solid var(--border); border-radius: 12px; padding: 14px 18px; color: var(--text); font-size: 15px; font-family: 'DM Sans', sans-serif; outline: none; transition: border-color 0.2s; margin-bottom: 20px; }
+  .topic-input:focus { border-color: rgba(124,106,255,0.5); }
+  .topic-input::placeholder { color: var(--muted); }
+  .side-select { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 8px; }
+  .side-btn { background: var(--surface2); border: 1.5px solid var(--border); border-radius: 12px; padding: 16px; cursor: pointer; transition: all 0.2s; text-align: center; color: var(--muted); font-family: 'DM Sans', sans-serif; }
+  .side-btn:hover { border-color: rgba(255,255,255,0.2); color: var(--text); }
+  .side-btn.active-for { border-color: var(--user-color); background: rgba(124,106,255,0.1); color: var(--user-color); }
+  .side-btn.active-against { border-color: var(--ai-color); background: rgba(255,77,109,0.1); color: var(--ai-color); }
+  .side-icon { font-size: 24px; margin-bottom: 6px; }
+  .side-label { font-size: 13px; font-weight: 500; letter-spacing: 1px; }
+  .side-desc { font-size: 11px; margin-top: 4px; opacity: 0.7; }
+  .start-btn { width: 100%; background: linear-gradient(135deg, var(--user-color), #ff4d6d); border: none; border-radius: 12px; padding: 16px; color: #fff; font-size: 15px; font-family: 'Bebas Neue', sans-serif; letter-spacing: 3px; cursor: pointer; transition: all 0.2s; margin-top: 8px; }
+  .start-btn:hover { transform: translateY(-2px); box-shadow: 0 8px 30px rgba(124,106,255,0.4); }
+  .start-btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none; box-shadow: none; }
+  #arena-screen { display: none; flex-direction: column; height: 100vh; }
+  .arena-header { padding: 16px 24px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; background: var(--surface); flex-shrink: 0; }
+  .arena-topic { font-family: 'Bebas Neue', sans-serif; font-size: 18px; letter-spacing: 1px; color: var(--gold); max-width: 400px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .chat-area { flex: 1; overflow-y: auto; padding: 24px; display: flex; flex-direction: column; gap: 16px; scroll-behavior: smooth; }
+  .chat-area::-webkit-scrollbar { width: 4px; }
+  .chat-area::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+  .message { display: flex; gap: 12px; max-width: 80%; animation: msgIn 0.3s ease forwards; }
+  @keyframes msgIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+  .message.user { align-self: flex-end; flex-direction: row-reverse; }
+  .message.ai { align-self: flex-start; }
+  .message.system { align-self: center; max-width: 100%; }
+  .avatar { width: 36px; height: 36px; border-radius: 10px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-family: 'Bebas Neue', sans-serif; font-size: 14px; letter-spacing: 1px; }
+  .avatar.user-av { background: rgba(124,106,255,0.2); border: 1px solid rgba(124,106,255,0.4); color: var(--user-color); }
+  .avatar.ai-av { background: rgba(255,77,109,0.2); border: 1px solid rgba(255,77,109,0.4); color: var(--ai-color); }
+  .bubble { padding: 14px 18px; border-radius: 16px; font-size: 14px; line-height: 1.7; }
+  .bubble.user-bubble { background: rgba(124,106,255,0.15); border: 1px solid rgba(124,106,255,0.25); border-top-right-radius: 4px; color: #d4d0ff; }
+  .bubble.ai-bubble { background: rgba(255,77,109,0.1); border: 1px solid rgba(255,77,109,0.2); border-top-left-radius: 4px; color: #ffd0d8; }
+  .bubble.system-bubble { background: rgba(255,201,77,0.1); border: 1px solid rgba(255,201,77,0.2); border-radius: 12px; color: var(--gold); font-size: 13px; text-align: center; padding: 10px 20px; width: 100%; }
+  .msg-label { font-size: 10px; letter-spacing: 1.5px; font-weight: 500; margin-bottom: 6px; opacity: 0.6; }
+  .verdict-card { background: var(--surface); border: 1px solid rgba(255,201,77,0.3); border-radius: 16px; padding: 24px; margin: 8px 0; animation: msgIn 0.4s ease forwards; width: 100%; align-self: center; }
+  .verdict-title { font-family: 'Bebas Neue', sans-serif; font-size: 28px; letter-spacing: 2px; color: var(--gold); margin-bottom: 16px; text-align: center; }
+  .winner-announce { text-align: center; padding: 12px; border-radius: 10px; font-weight: 500; font-size: 14px; margin-bottom: 12px; }
+  .input-area { padding: 16px 24px; border-top: 1px solid var(--border); background: var(--surface); flex-shrink: 0; }
+  .input-wrap { display: flex; gap: 10px; align-items: flex-end; background: var(--surface2); border: 1px solid var(--border); border-radius: 14px; padding: 10px 14px; transition: border-color 0.2s; }
+  .input-wrap:focus-within { border-color: rgba(124,106,255,0.4); }
+  #user-input { flex: 1; background: none; border: none; outline: none; color: var(--text); font-size: 14px; font-family: 'DM Sans', sans-serif; resize: none; max-height: 120px; line-height: 1.5; }
+  #user-input::placeholder { color: var(--muted); }
+  .send-btn { width: 36px; height: 36px; background: linear-gradient(135deg, var(--user-color), #ff4d6d); border: none; border-radius: 10px; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: all 0.2s; font-size: 16px; color: white; }
+  .send-btn:hover { transform: scale(1.05); }
+  .send-btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+  .input-hint { font-size: 11px; color: var(--muted); text-align: center; margin-top: 8px; }
+  .typing-indicator { display: flex; gap: 4px; align-items: center; padding: 14px 18px; }
+  .typing-dot { width: 6px; height: 6px; background: var(--ai-color); border-radius: 50%; animation: typingBounce 1.2s ease-in-out infinite; }
+  .typing-dot:nth-child(2) { animation-delay: 0.2s; }
+  .typing-dot:nth-child(3) { animation-delay: 0.4s; }
+  @keyframes typingBounce { 0%, 60%, 100% { transform: translateY(0); opacity: 0.4; } 30% { transform: translateY(-6px); opacity: 1; } }
+  .new-debate-btn { background: var(--surface2); border: 1px solid var(--border); border-radius: 10px; padding: 10px 20px; color: var(--muted); font-family: 'DM Sans', sans-serif; font-size: 13px; cursor: pointer; transition: all 0.2s; display: block; margin: 8px auto 0; }
+  .new-debate-btn:hover { color: var(--text); border-color: rgba(255,255,255,0.2); }
+  .rounds-left { font-size: 11px; letter-spacing: 1px; color: var(--muted); }
+</style>
+</head>
+<body>
+<div class="bg-orb orb1"></div>
+<div class="bg-orb orb2"></div>
+
+<div id="setup-screen">
+  <div class="setup-inner">
+    <div class="badge">⚡ AI POWERED</div>
+    <h1>DEBATE<br>ARENA</h1>
+    <p class="subtitle">Pick a side. Make your case. Survive the AI's rebuttal.</p>
+    <div class="setup-card">
+      <div class="label">YOUR TOPIC</div>
+      <input class="topic-input" id="topic-input" placeholder="e.g. Is social media destroying society?" maxlength="120" />
+      <div class="label">YOUR SIDE</div>
+      <div class="side-select">
+        <button class="side-btn" id="btn-for" onclick="selectSide('for')">
+          <div class="side-icon">✅</div>
+          <div class="side-label">FOR</div>
+          <div class="side-desc">You argue in favor</div>
+        </button>
+        <button class="side-btn" id="btn-against" onclick="selectSide('against')">
+          <div class="side-icon">❌</div>
+          <div class="side-label">AGAINST</div>
+          <div class="side-desc">You argue against</div>
+        </button>
+      </div>
+    </div>
+    <button class="start-btn" id="start-btn" onclick="startDebate()" disabled>ENTER THE ARENA →</button>
+  </div>
+</div>
+
+<div id="arena-screen">
+  <div class="arena-header">
+    <div>
+      <div class="arena-topic" id="header-topic"></div>
+      <span class="rounds-left" id="rounds-left"></span>
+    </div>
+    <span style="color:var(--muted);font-size:12px;letter-spacing:1px;">AI DEBATE ARENA</span>
+  </div>
+  <div class="chat-area" id="chat-area"></div>
+  <div class="input-area" id="input-area">
+    <div class="input-wrap">
+      <textarea id="user-input" rows="1" placeholder="Make your argument…" onkeydown="handleKey(event)" oninput="autoResize(this)"></textarea>
+      <button class="send-btn" id="send-btn" onclick="sendMessage()">→</button>
+    </div>
+    <div class="input-hint">Press Enter to send • Shift+Enter for new line</div>
+  </div>
+</div>
+
+<script>
+  const API_URL = "/api/debate";
+  let userSide = null, topic = "", history = [], round = 0, debateOver = false;
+  const MAX_ROUNDS = 3;
+
+  document.getElementById('topic-input').addEventListener('input', validateSetup);
+
+  function selectSide(side) {
+    userSide = side;
+    document.getElementById('btn-for').className = 'side-btn' + (side === 'for' ? ' active-for' : '');
+    document.getElementById('btn-against').className = 'side-btn' + (side === 'against' ? ' active-against' : '');
+    validateSetup();
+  }
+
+  function validateSetup() {
+    const t = document.getElementById('topic-input').value.trim();
+    document.getElementById('start-btn').disabled = !(t && userSide);
+  }
+
+  async function startDebate() {
+    topic = document.getElementById('topic-input').value.trim();
+    document.getElementById('setup-screen').style.display = 'none';
+    const arena = document.getElementById('arena-screen');
+    arena.style.display = 'flex';
+    document.getElementById('header-topic').textContent = topic;
+    updateRoundsLeft();
+    const aiSide = userSide === 'for' ? 'AGAINST' : 'FOR';
+    addSystemMsg(`⚔️ Debate begins! You are arguing ${userSide.toUpperCase()}. AI argues ${aiSide}. ${MAX_ROUNDS} rounds each.`);
+    const opening = await callAI([{ role: "user", content: `Give a sharp 2-sentence opening statement arguing ${aiSide} the topic: "${topic}". Be bold. No intro phrases.` }], `You are a debate champion arguing ${aiSide} "${topic}". Be direct and persuasive. Max 3 sentences.`);
+    addAIMsg(opening);
+    history.push({ role: "assistant", content: opening });
+    addSystemMsg(`Round 1 of ${MAX_ROUNDS} — Your turn!`);
+  }
+
+  function updateRoundsLeft() {
+    const left = MAX_ROUNDS - round;
+    document.getElementById('rounds-left').textContent = left > 0 ? `${left} ROUND${left !== 1 ? 'S' : ''} LEFT` : 'FINAL ROUND DONE';
+  }
+
+  async function sendMessage() {
+    if (debateOver) return;
+    const input = document.getElementById('user-input');
+    const text = input.value.trim();
+    if (!text) return;
+    input.value = ''; autoResize(input);
+    document.getElementById('send-btn').disabled = true;
+    addUserMsg(text);
+    history.push({ role: "user", content: text });
+    round++; updateRoundsLeft();
+    const aiSide = userSide === 'for' ? 'AGAINST' : 'FOR';
+    const systemPrompt = `You are a debate champion arguing ${aiSide} "${topic}". Be direct and persuasive. Max 3 sentences.`;
+    showTyping();
+    const rebuttal = await callAI([...history], systemPrompt);
+    removeTyping(); addAIMsg(rebuttal);
+    history.push({ role: "assistant", content: rebuttal });
+    if (round >= MAX_ROUNDS) {
+      debateOver = true;
+      document.getElementById('input-area').innerHTML = `<div style="text-align:center;padding:16px;color:var(--gold);font-size:12px;letter-spacing:2px;">⚖️ JUDGING IN PROGRESS...</div>`;
+      await judgeDebate();
+    } else {
+      document.getElementById('send-btn').disabled = false;
+      addSystemMsg(`Round ${round + 1} of ${MAX_ROUNDS} — Your turn!`);
+    }
+  }
+
+  async function judgeDebate() {
+    const transcript = history.map(m => {
+      const who = m.role === 'user' ? `USER (${userSide.toUpperCase()})` : `AI (${userSide === 'for' ? 'AGAINST' : 'FOR'})`;
+      return `${who}: ${m.content}`;
+    }).join('\n\n');
+    const judgePrompt = `You are an impartial debate judge. Score this debate on: "${topic}".\n\nTranscript:\n${transcript}\n\nRespond ONLY with valid JSON:\n{"user_logic":85,"user_evidence":72,"user_clarity":80,"user_persuasion":78,"ai_logic":88,"ai_evidence":75,"ai_clarity":85,"ai_persuasion":82,"winner":"user","user_total":79,"ai_total":83,"feedback":"Your feedback here.","best_moment":"Best moment here.","worst_moment":"Worst moment here."}`;
+    const res = await callAI([{ role: "user", content: judgePrompt }], "You are a strict debate judge. Return only valid JSON.");
+    let v;
+    try { v = JSON.parse(res.replace(/```json|```/g, '').trim()); }
+    catch { v = { user_logic:70,user_evidence:65,user_clarity:72,user_persuasion:68,ai_logic:78,ai_evidence:72,ai_clarity:80,ai_persuasion:75,winner:"ai",user_total:69,ai_total:76,feedback:"A close debate. Keep practicing!",best_moment:"Your opening.",worst_moment:"Weak rebuttal." }; }
+    showVerdict(v);
+  }
+
+  function scoreRow(label, val, color) {
+    return `<div style="margin-bottom:8px;"><div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:3px;"><span style="color:var(--muted);letter-spacing:1px">${label.toUpperCase()}</span><span style="color:${color}">${val}</span></div><div style="background:rgba(255,255,255,0.05);border-radius:100px;height:4px;overflow:hidden;"><div style="width:${val}%;height:100%;background:${color};border-radius:100px;"></div></div></div>`;
+  }
+
+  function showVerdict(v) {
+    const userWon = v.winner === 'user';
+    const chat = document.getElementById('chat-area');
+    const card = document.createElement('div');
+    card.className = 'verdict-card';
+    card.innerHTML = `
+      <div class="verdict-title">⚖️ JUDGE'S VERDICT</div>
+      <div class="winner-announce" style="background:${userWon?'rgba(124,106,255,0.15)':'rgba(255,77,109,0.15)'};border:1px solid ${userWon?'rgba(124,106,255,0.3)':'rgba(255,77,109,0.3)'};color:${userWon?'var(--user-color)':'var(--ai-color)'}">
+        ${userWon ? '🏆 YOU WIN!' : '🤖 AI WINS THIS ROUND'}
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px;">
+        <div style="background:rgba(124,106,255,0.08);border:1px solid rgba(124,106,255,0.15);border-radius:12px;padding:16px;">
+          <div style="font-size:10px;letter-spacing:2px;color:var(--user-color);margin-bottom:10px;">YOU</div>
+          ${scoreRow('Logic',v.user_logic,'var(--user-color)')}${scoreRow('Evidence',v.user_evidence,'var(--user-color)')}${scoreRow('Clarity',v.user_clarity,'var(--user-color)')}${scoreRow('Persuasion',v.user_persuasion,'var(--user-color)')}
+          <div style="margin-top:10px;font-size:20px;font-family:'Bebas Neue',sans-serif;color:var(--user-color)">${v.user_total}<span style="font-size:12px;opacity:0.6">/100</span></div>
+        </div>
+        <div style="background:rgba(255,77,109,0.08);border:1px solid rgba(255,77,109,0.15);border-radius:12px;padding:16px;">
+          <div style="font-size:10px;letter-spacing:2px;color:var(--ai-color);margin-bottom:10px;">AI</div>
+          ${scoreRow('Logic',v.ai_logic,'var(--ai-color)')}${scoreRow('Evidence',v.ai_evidence,'var(--ai-color)')}${scoreRow('Clarity',v.ai_clarity,'var(--ai-color)')}${scoreRow('Persuasion',v.ai_persuasion,'var(--ai-color)')}
+          <div style="margin-top:10px;font-size:20px;font-family:'Bebas Neue',sans-serif;color:var(--ai-color)">${v.ai_total}<span style="font-size:12px;opacity:0.6">/100</span></div>
+        </div>
+      </div>
+      <div style="background:var(--surface2);border-radius:10px;padding:14px;margin-bottom:12px;">
+        <div style="font-size:10px;letter-spacing:2px;color:var(--muted);margin-bottom:6px;">JUDGE'S FEEDBACK</div>
+        <div style="font-size:13px;line-height:1.7;color:#bbb;font-style:italic;">"${v.feedback}"</div>
+      </div>
+      ${v.best_moment?`<div style="font-size:12px;color:#666;margin-bottom:4px;">✨ Best: <span style="color:#aaa">${v.best_moment}</span></div>`:''}
+      ${v.worst_moment?`<div style="font-size:12px;color:#666;margin-bottom:14px;">⚠️ Weakest: <span style="color:#aaa">${v.worst_moment}</span></div>`:''}
+      <button class="new-debate-btn" onclick="resetDebate()">← New Debate</button>`;
+    document.getElementById('input-area').innerHTML = '';
+    chat.appendChild(card);
+    chat.scrollTop = chat.scrollHeight;
+  }
+
+  function resetDebate() {
+    userSide=null;topic="";history=[];round=0;debateOver=false;
+    document.getElementById('arena-screen').style.display='none';
+    document.getElementById('setup-screen').style.display='flex';
+    document.getElementById('chat-area').innerHTML='';
+    document.getElementById('topic-input').value='';
+    document.getElementById('btn-for').className='side-btn';
+    document.getElementById('btn-against').className='side-btn';
+    document.getElementById('start-btn').disabled=true;
+    document.getElementById('input-area').innerHTML=`<div class="input-wrap"><textarea id="user-input" rows="1" placeholder="Make your argument…" onkeydown="handleKey(event)" oninput="autoResize(this)"></textarea><button class="send-btn" id="send-btn" onclick="sendMessage()">→</button></div><div class="input-hint">Press Enter to send • Shift+Enter for new line</div>`;
+  }
+
+  async function callAI(messages, systemPrompt) {
+    try {
+      const res = await fetch(API_URL, { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({ messages, systemPrompt }) });
+      const data = await res.json();
+      return data.result || "...";
+    } catch { return "Error. Try again."; }
+  }
+
+  function addUserMsg(text) {
+    const chat = document.getElementById('chat-area');
+    const div = document.createElement('div'); div.className='message user';
+    div.innerHTML=`<div class="avatar user-av">YOU</div><div><div class="msg-label" style="text-align:right;color:var(--user-color)">YOU · ${userSide?.toUpperCase()}</div><div class="bubble user-bubble">${escHtml(text)}</div></div>`;
+    chat.appendChild(div); chat.scrollTop=chat.scrollHeight;
+  }
+
+  function addAIMsg(text) {
+    const chat = document.getElementById('chat-area');
+    const div = document.createElement('div'); div.className='message ai';
+    const aiSide = userSide==='for'?'AGAINST':'FOR';
+    div.innerHTML=`<div class="avatar ai-av">AI</div><div><div class="msg-label" style="color:var(--ai-color)">AI · ${aiSide}</div><div class="bubble ai-bubble">${escHtml(text)}</div></div>`;
+    chat.appendChild(div); chat.scrollTop=chat.scrollHeight;
+  }
+
+  function addSystemMsg(text) {
+    const chat = document.getElementById('chat-area');
+    const div = document.createElement('div'); div.className='message system';
+    div.innerHTML=`<div class="bubble system-bubble">${text}</div>`;
+    chat.appendChild(div); chat.scrollTop=chat.scrollHeight;
+  }
+
+  function showTyping() {
+    const chat = document.getElementById('chat-area');
+    const div = document.createElement('div'); div.id='typing-msg'; div.className='message ai';
+    div.innerHTML=`<div class="avatar ai-av">AI</div><div class="bubble ai-bubble"><div class="typing-indicator"><div class="typing-dot"></div><div class="typing-dot"></div><div class="typing-dot"></div></div></div>`;
+    chat.appendChild(div); chat.scrollTop=chat.scrollHeight;
+  }
+
+  function removeTyping() { document.getElementById('typing-msg')?.remove(); }
+  function handleKey(e) { if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();sendMessage();} }
+  function autoResize(el) { el.style.height='auto'; el.style.height=Math.min(el.scrollHeight,120)+'px'; }
+  function escHtml(t) { return t.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>'); }
+</script>
+</body>
+</html>
